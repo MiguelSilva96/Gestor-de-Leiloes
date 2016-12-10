@@ -30,9 +30,9 @@ public class SistemaLeiloes {
 		}
 	}
 
-	public HashMap<String, Utilizador> utilizadores;
-	public HashMap<Integer, Leilao> leiloes;
-	public Lock systemLocker;
+	private HashMap<String, Utilizador> utilizadores;
+	private HashMap<Integer, Leilao> leiloes;
+	private Lock systemLocker;
 
 	public SistemaLeiloes() {
 		utilizadores = new HashMap<>();
