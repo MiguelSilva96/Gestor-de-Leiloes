@@ -40,8 +40,14 @@ public class SistemaLeiloes {
 		systemLocker = new ReentrantLock();
 	}
 
-	public void registarUtilizador(String username, String password) throws UtilizadorException {
-		//implementação (username pode ja existir)
+    
+    public void registarUtilizador(String username, String password) throws UtilizadorException {
+	if (utilizadores.containsKey(username)) {
+            throw new UtilizadorException("Nome de utilizador indispon�vel");
+        }
+        
+        Utilizador user = new Utilizador (username, password);
+        utilizadores.put(username, user);
 	}
 
 	public boolean autenticar(String username, String password) {

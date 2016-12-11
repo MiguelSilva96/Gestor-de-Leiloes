@@ -1,5 +1,7 @@
-public class UtilizadorException extends Exception {
-	String message;
+import java.lang.Exception;
+
+public class UtilizadorException extends Exception {  
+        String message;
 	
 	public UtilizadorException(String message) {
 		this.message = message;
