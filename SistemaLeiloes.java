@@ -1,6 +1,8 @@
 import java.util.concurrent.locks.*;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
 public class SistemaLeiloes {
 
@@ -9,12 +11,16 @@ public class SistemaLeiloes {
 		private int valor_atual;
 		private String descricao_item;
 		private String ultimoLicitador;
+		private String vendedor;
 		private Lock leilaoLocker;
+		private Set<String> licitadores;
 
-		public Leilao(int valor_inicial, String descricao_item) {
+		public Leilao(int valor_inicial, String descricao_item, String vendedor) {
 			this.descricao_item = descricao_item;
+			this.vendedor = vendedor;
 			ultimoLicitador = null;
 			valor_atual = valor_inicial;
+			licitadores = new TreeSet<>();
 			leilaoLocker = new ReentrantLock();
 		}
 	}
@@ -40,26 +46,39 @@ public class SistemaLeiloes {
 		systemLocker = new ReentrantLock();
 	}
 
-    
+    //Registar utilizador no sistema
     public void registarUtilizador(String username, String password) throws UtilizadorException {
-	if (utilizadores.containsKey(username)) {
-            throw new UtilizadorException("Nome de utilizador indispon�vel");
+    	systemLocker.lock();
+    	try {
+			if(utilizadores.containsKey(username)) {
+				throw new UtilizadorException("Nome de utilizador indisponível");
+        	}
+        	Utilizador user = new Utilizador(username, password);
+        	utilizadores.put(username, user);
+        } finally {
+        	systemLocker.unlock();
         }
-        
-        Utilizador user = new Utilizador (username, password);
-        utilizadores.put(username, user);
 	}
 
+	//Autenticar utilizador
 	public boolean autenticar(String username, String password) {
-		return true;
+		systemLocker.lock();
+		try {
+			if(utilizadores.containsKey(username))
+				return true;
+			return false;
+		} finally {
+			systemLocker.unlock();
+		}
 	}
 
 	//Ainda deve receber o valor inicial como argumento
-	public void iniciarLeilao(String descricaoItem, String username) throws UtilizadorException {
+	public void iniciarLeilao(String descricaoItem, String vendedor) throws UtilizadorException {
 		//implementação (username pode nao existir)
 	}
 
-	public List<Leilao> listarLeiloes() {
+	//Listar leiloes
+	public List<String> listarLeiloes(String username) {
 		//implementação
 		return null;
 	}
@@ -71,7 +90,7 @@ public class SistemaLeiloes {
 		Utilizador u;
 		try {
 			l = getLeilao(idLeilao);
-			u = getUtilizador(username); //Se o utilizador não existir, exceção e nao faz licitação
+			u = getUtilizador(username);
 			l.leilaoLocker.lock();
 		} finally {
 			systemLocker.unlock();
@@ -79,6 +98,7 @@ public class SistemaLeiloes {
 		try {
 			if(valor > l.valor_atual) {
 				l.valor_atual = valor;
+				l.licitadores.add(username);
 				l.ultimoLicitador = username;
 			}
 			else throw new LeilaoException("O valor atual no leilao é igual ou superior!");
@@ -87,17 +107,29 @@ public class SistemaLeiloes {
 		}
 	}
 
+	public List<String> getLicitadores(int idLeilao) {
+		return null;
+	}
+
 	public String finalizarLeilao(int idLeilao, String username) {
-		//implementação (username pode ser de outro user que nao o vendedor)
 		return null;
 	}
 
 	private Leilao getLeilao(int idLeilao) throws LeilaoException {
-		return null;
+		Leilao l;
+		if(leiloes.containsKey(idLeilao))
+			l = leiloes.get(idLeilao);
+		else
+			throw new LeilaoException("Leilao não existente");
+		return l;
 	}
 
 	private Utilizador getUtilizador(String username) throws UtilizadorException {
-		return null;
+		Utilizador u;
+		if(utilizadores.containsKey(username))
+			u = utilizadores.get(username);
+		else
+			throw new UtilizadorException("Utilizador não existente");
+		return u;
 	}
-
 }
