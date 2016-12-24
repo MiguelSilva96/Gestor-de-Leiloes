@@ -87,10 +87,8 @@ public class SistemaLeiloes {
 	public void licitarItem(int idLeilao, int valor, String username) throws LeilaoException, UtilizadorException {
 		systemLocker.lock();
 		Leilao l;
-		Utilizador u;
 		try {
 			l = getLeilao(idLeilao);
-			u = getUtilizador(username);
 			l.leilaoLocker.lock();
 		} finally {
 			systemLocker.unlock();
@@ -107,9 +105,6 @@ public class SistemaLeiloes {
 		}
 	}
 
-	public List<String> getLicitadores(int idLeilao) {
-		return null;
-	}
 
 	public String finalizarLeilao(int idLeilao, String username) {
 		return null;
