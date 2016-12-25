@@ -134,6 +134,7 @@ public class SistemaLeiloes {
 				leilao.valor_atual = valor;
 				leilao.licitadores.add(user);
 				leilao.ultimoLicitador = username;
+				leilao.addMessageLicitadores(idLeilao);
 			}
 			else throw new LeilaoException("O valor atual no leilao é igual ou superior!");
 		} finally {
