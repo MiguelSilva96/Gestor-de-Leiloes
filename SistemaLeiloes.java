@@ -54,6 +54,20 @@ public class SistemaLeiloes {
 					u.mensagens.add(mensagem);
 				}
 		}
+
+		void finalizaLeilao (int idLeilao) {
+			StringBuilder message = new StringBuilder();
+			String mensagem;
+			message.append("O utilizador vencedor foi ");
+			message.append(ultimoLicitador);
+			message.append(" com o valor final de ");
+			message.append(valor_atual);
+			mensagem = message.toString();
+			for(Utilizador u : licitadores)
+				synchronized(u) {
+					u.mensagens.add(mensagem);
+				}
+		}
 	}
 
 	private HashMap<String, Utilizador> utilizadores;
@@ -148,7 +162,25 @@ public class SistemaLeiloes {
 
 	//Finaliza um leilão
 	public String finalizarLeilao(int idLeilao, String username) throws UtilizadorException {
-		return null;
+		Leilao leilao;
+		Utilizador user;
+		synchronized(this) {
+			leilao = getLeilao(idLeilao);
+			user = utilizadores.get(username);
+			if (user.username.equals(leilao.vendedor)) {
+				throw new UtilizadorException ("Sem permissão para finalizar leilão.");
+			}
+			else
+				leilao.leilaoLocker.lock();
+		}
+		try {	
+			leilao.finalizaLeilao(idLeilao);
+			notifyAll();
+			leiloes.remove(idLeilao);
+		} 
+		finally {
+			leilao.leilaoLocker.unlock();
+		}
 	}
 
 	//Método auxiliar para obter um dos leilões no Map
