@@ -111,7 +111,7 @@ public class SistemaLeiloes {
 
 	//Listar leiloes
 	public List<String> listarLeiloes(String username) {
-		//implementação
+		
 		return null;
 	}
 
@@ -135,6 +135,10 @@ public class SistemaLeiloes {
 				leilao.licitadores.add(user);
 				leilao.ultimoLicitador = username;
 				leilao.addMessageLicitadores(idLeilao);
+				notifyAll(); //Acorda os que estao a espera de mensagens
+				//Em termos de eficiencia, notifyAll nao é a melhor soluçao
+				//Porque a mensagem nao é adicionada a todos
+				//Existir uma Condition em cada utilizador melhora essa situaçao
 			}
 			else throw new LeilaoException("O valor atual no leilao é igual ou superior!");
 		} finally {
