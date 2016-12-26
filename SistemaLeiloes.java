@@ -27,6 +27,7 @@ public class SistemaLeiloes {
 		private String ultimoLicitador;
 		private String vendedor;
 		private Lock leilaoLocker;
+		private Boolean aDecorrer;
 		private Set<Utilizador> licitadores;
 
 		public Leilao(int valor_inicial, String descricao_item, String vendedor) {
@@ -36,6 +37,7 @@ public class SistemaLeiloes {
 			valor_atual = valor_inicial;
 			licitadores = new TreeSet<>();
 			leilaoLocker = new ReentrantLock();
+			aDecorrer = true;
 		}
 
 		void addMessageLicitadores(int idLeilao) {
@@ -55,10 +57,12 @@ public class SistemaLeiloes {
 				}
 		}
 
-		void finalizaLeilao (int idLeilao) {
+		String finalizaLeilao (int idLeilao, Utilizador user) {
 			StringBuilder message = new StringBuilder();
 			String mensagem;
-			message.append("O utilizador vencedor foi ");
+			message.append("O utilizador vencedor do leilao ");
+			message.append(idLeilao);
+			message.append("(" + descricao_item + ") " + "foi ");
 			message.append(ultimoLicitador);
 			message.append(" com o valor final de ");
 			message.append(valor_atual);
@@ -67,6 +71,8 @@ public class SistemaLeiloes {
 				synchronized(u) {
 					u.mensagens.add(mensagem);
 				}
+			aDecorrer = false;
+			return mensagem;
 		}
 	}
 
@@ -144,12 +150,16 @@ public class SistemaLeiloes {
 			leilao.leilaoLocker.lock();
 		}
 		try {
+			if(!leilao.aDecorrer) {
+				throw new LeilaoException("O leilao já terminou!");
+			}
 			if(valor > leilao.valor_atual) {
 				leilao.valor_atual = valor;
 				leilao.licitadores.add(user);
 				leilao.ultimoLicitador = username;
 				leilao.addMessageLicitadores(idLeilao);
-				notifyAll(); //Acorda os que estao a espera de mensagens
+				notifyAll(); 
+				//Acorda os que estao a espera de mensagens
 				//Em termos de eficiencia, notifyAll nao é a melhor soluçao
 				//Porque a mensagem nao é adicionada a todos
 				//Existir uma Condition em cada utilizador melhora essa situaçao
@@ -161,26 +171,29 @@ public class SistemaLeiloes {
 	}
 
 	//Finaliza um leilão
-	public String finalizarLeilao(int idLeilao, String username) throws UtilizadorException {
+	public String finalizarLeilao(int idLeilao, String username) throws LeilaoException, UtilizadorException {
 		Leilao leilao;
 		Utilizador user;
+		String mensagem;
 		synchronized(this) {
 			leilao = getLeilao(idLeilao);
 			user = utilizadores.get(username);
-			if (user.username.equals(leilao.vendedor)) {
+			if (!user.username.equals(leilao.vendedor)) {
 				throw new UtilizadorException ("Sem permissão para finalizar leilão.");
 			}
-			else
-				leilao.leilaoLocker.lock();
+			leilao.leilaoLocker.lock();
 		}
 		try {	
-			leilao.finalizaLeilao(idLeilao);
+			mensagem = leilao.finalizaLeilao(idLeilao, user);
 			notifyAll();
-			leiloes.remove(idLeilao);
 		} 
 		finally {
 			leilao.leilaoLocker.unlock();
 		}
+		synchronized(this) {
+				leiloes.remove(idLeilao);
+		}
+		return mensagem;
 	}
 
 	//Método auxiliar para obter um dos leilões no Map

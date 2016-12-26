@@ -1,6 +1,13 @@
 import java.net.*;
 import java.io.*;
 
+class ClientMessenger extends Thread {
+	
+}
+
+class ClientHandler extends Thread {
+
+}
 
 public class Server {
 
@@ -10,8 +17,8 @@ public class Server {
 		ServerSocket srv = new ServerSocket(portNumber);
 		while(true) {
 			Socket client = srv.accept();
-			/* Classes ainda por implementar.
-			ClientMessager clientMessager = new ClientMessager(client, sistemaLeiloes);
+/*
+			ClientMessenger clientMessenger = new ClientMessenger(client, sistemaLeiloes);
 			ClientHandler clientHandler = new ClientHandler(client, sistemaLeiloes, clientMessager);
 			clientMessager.start();
 			clientHandler.start();*/
