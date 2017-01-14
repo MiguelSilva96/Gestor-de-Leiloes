@@ -2,12 +2,11 @@ import java.util.concurrent.locks.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.Set;
 import java.util.TreeSet;
 
 public class SistemaLeiloes {
 
-	class Utilizador {
+	class Utilizador implements Comparable {
 
 		final String username;
 		final String password;
@@ -16,7 +15,25 @@ public class SistemaLeiloes {
 		public Utilizador(String username, String password) {
 			this.username = username;
 			this.password = password;
-			mensagens = new ArrayList<>();
+			mensagens = new ArrayList<String>();
+		}
+
+		synchronized void adiciona(String msg) {
+			mensagens.add(msg);
+			notifyAll();
+		}
+
+		synchronized String getMsg() {
+			while(mensagens.size()==0)
+				try{wait();} catch(Exception e) {}
+			String msg = mensagens.get(0);
+			mensagens.remove(0);
+			return msg;
+		}
+
+		public int compareTo(Object o) {
+			Utilizador u = (Utilizador) o;
+			return username.compareTo(u.username);
 		}
 	}
 
@@ -27,13 +44,13 @@ public class SistemaLeiloes {
 		private String ultimoLicitador;
 		private String vendedor;
 		private Lock leilaoLocker;
-		private Boolean aDecorrer;
-		private Set<Utilizador> licitadores;
+		private boolean aDecorrer;
+		private TreeSet<Utilizador> licitadores;
 
 		public Leilao(int valor_inicial, String descricao_item, String vendedor) {
 			this.descricao_item = descricao_item;
 			this.vendedor = vendedor;
-			ultimoLicitador = null;
+			ultimoLicitador = "";
 			valor_atual = valor_inicial;
 			licitadores = new TreeSet<>();
 			leilaoLocker = new ReentrantLock();
@@ -53,26 +70,22 @@ public class SistemaLeiloes {
 			mensagem = message.toString();
 			for(Utilizador u : licitadores)
 				synchronized(u) {
-					u.mensagens.add(mensagem);
+					u.adiciona(mensagem);
 				}
 		}
 
 		String finalizaLeilao (int idLeilao, Utilizador user) {
 			StringBuilder message = new StringBuilder();
-			String mensagem;
 			message.append("O utilizador vencedor do leilao ");
 			message.append(idLeilao);
 			message.append("(" + descricao_item + ") " + "foi ");
 			message.append(ultimoLicitador);
 			message.append(" com o valor final de ");
 			message.append(valor_atual);
-			mensagem = message.toString();
 			for(Utilizador u : licitadores)
-				synchronized(u) {
-					u.mensagens.add(mensagem);
-				}
+				u.adiciona(message.toString());
 			aDecorrer = false;
-			return mensagem;
+			return message.toString();
 		}
 	}
 
@@ -83,6 +96,7 @@ public class SistemaLeiloes {
 	public SistemaLeiloes() {
 		utilizadores = new HashMap<>();
 		leiloes = new HashMap<>();
+		currentID = 0;
 	}
 
 	/**
@@ -124,15 +138,35 @@ public class SistemaLeiloes {
 	public int iniciarLeilao(String descricaoItem, String vendedor, int valor_inicial) {
 		Leilao l = new Leilao(valor_inicial, descricaoItem, vendedor);
 		synchronized(this) {
-			leiloes.put(++currentID, l);
+			currentID++;
+			leiloes.put(new Integer(currentID), l);
 			return currentID;
 		}
 	}
 
 	//Listar leiloes
 	public List<String> listarLeiloes(String username) {
-		
-		return null;
+		List<String> result = new ArrayList<>();
+		synchronized(this) {
+			leiloes.forEach((k,v) -> v.leilaoLocker.lock());
+		try {
+			leiloes.forEach((k,v) -> {
+				StringBuilder sb = new StringBuilder();
+				sb.append("Id leilao: ").append(k);
+				sb.append(". ").append(v.descricao_item);
+				sb.append(". Valor atual: ").append(v.valor_atual);
+				sb.append(".");
+				if(v.ultimoLicitador.equals(username))
+					sb.append(" +");
+				if(v.vendedor.equals(username))
+					sb.append(" *");
+				result.add(sb.toString());
+			});
+		} finally {
+			leiloes.forEach((k,v) -> v.leilaoLocker.unlock());
+		}
+		}
+		return result;
 	}
 
 	/**
@@ -141,7 +175,7 @@ public class SistemaLeiloes {
 	 * @param valor	   Valor da licitação
 	 * @param username Username do utilizador a licitar
 	 */
-	public void licitarItem(int idLeilao, int valor, String username) throws LeilaoException, UtilizadorException {
+	public void licitarItem(int idLeilao, int valor, String username) throws LeilaoException {
 		Leilao leilao;
 		Utilizador user;
 		synchronized(this) {
@@ -158,11 +192,6 @@ public class SistemaLeiloes {
 				leilao.licitadores.add(user);
 				leilao.ultimoLicitador = username;
 				leilao.addMessageLicitadores(idLeilao);
-				notifyAll(); 
-				//Acorda os que estao a espera de mensagens
-				//Em termos de eficiencia, notifyAll nao é a melhor soluçao
-				//Porque a mensagem nao é adicionada a todos
-				//Existir uma Condition em cada utilizador melhora essa situaçao
 			}
 			else throw new LeilaoException("O valor atual no leilao é igual ou superior!");
 		} finally {
@@ -174,7 +203,7 @@ public class SistemaLeiloes {
 	public String finalizarLeilao(int idLeilao, String username) throws LeilaoException, UtilizadorException {
 		Leilao leilao;
 		Utilizador user;
-		String mensagem;
+		String message;
 		synchronized(this) {
 			leilao = getLeilao(idLeilao);
 			user = utilizadores.get(username);
@@ -182,18 +211,17 @@ public class SistemaLeiloes {
 				throw new UtilizadorException ("Sem permissão para finalizar leilão.");
 			}
 			leilao.leilaoLocker.lock();
+			leiloes.remove(idLeilao);
 		}
 		try {	
-			mensagem = leilao.finalizaLeilao(idLeilao, user);
-			notifyAll();
-		} 
-		finally {
+			message = leilao.finalizaLeilao(idLeilao, user);
+		} finally {
 			leilao.leilaoLocker.unlock();
 		}
 		synchronized(this) {
 				leiloes.remove(idLeilao);
 		}
-		return mensagem;
+		return message;
 	}
 
 	//Método auxiliar para obter um dos leilões no Map
@@ -206,28 +234,17 @@ public class SistemaLeiloes {
 		return l;
 	}
 
-	/* 
-		Vai existir uma thread para cada user reservada para vir buscar mensagens
-		Isto vai servir para sempre que alguem licita num leilao todos saibam(todos que participaram)
-		Tambem serve para o finalizar leilão pois também vai adicionar mensagem nos moradores interessados 
-	*/
 
 	/**
 	 * Método para obter a próxima mensagem para utilizador
 	 * @param username Username do utilizador ao qual a mensagem é destinada
 	 * @return 		   Mensagem destinada ao utilizador em questão
 	 */
-	public String lerMensagem(String username) throws InterruptedException {
+	public String lerMensagem(String username) {
 		Utilizador user;
 		synchronized(this) {
 			user = utilizadores.get(username);
 		}
-		synchronized(user) {
-			while(user.mensagens.size() == 0)
-				wait();
-			String msg = user.mensagens.get(0);
-			user.mensagens.remove(0);
-			return msg;
-		}
+		return user.getMsg();
 	}
 }
