@@ -1,3 +1,9 @@
+/* 
+	Devia ser definido um protocolo sem as respostas em portugues, 
+	devem ser todas as respostas em "linguagem universal" e depois cada
+	cliente trata essa info conforme o tipo/origem do cliente.
+*/
+
 import java.net.*;
 import java.io.*;
 import java.util.List;
@@ -65,125 +71,131 @@ class ClientHandler extends Thread {
 					break;
 				}
 				String[] strs = str.split(" ");
-				if(ub.userOn == null) {
-					switch(strs[0]) {
-						case "l": 
-							boolean b = sistemaLeiloes.autenticar(strs[1], strs[2]);
-							if(b) {
-								synchronized(out) {
-									out.println("Login efetuado com sucesso!");
-									ub.userOn = strs[1];
-								}
-								cw.start();
-							}
-							else {
-								synchronized(out) {
-									out.println("Username ou password errados");
-								}
-							}
-							out.flush();
-							break;
-						case "r": 
-							try {
-								sistemaLeiloes.registarUtilizador(strs[1], strs[2]);
-							} catch (UtilizadorException e) {
-								synchronized(out) {
-									out.println(e.getMessage());
-									out.flush();
-								}
-								continue;
-							}
-							synchronized(out) {
-								out.println("Registo efetuado com sucesso!");
-							}
-							out.flush();
-							break;
-						default:
-							synchronized(out) {
-								out.println("Faça login ou registe-se");
-								out.flush();
-							}
-							break;
-					}
-				}
-				else {
-					switch(strs[0]) {
-						case "i":
-							int inicial = Integer.parseInt(strs[2]);
-							int result;
-							result = sistemaLeiloes.iniciarLeilao(strs[1], ub.userOn, inicial);
-							StringBuilder sb = new StringBuilder();
-							sb.append("Id do seu leilão: ").append(result);
-							sb.append(".");
-							synchronized(out) {
-								out.println(sb.toString());
-								out.flush();
-							}
-							break;
-						case "lc":
-							int id = Integer.parseInt(strs[1]);
-							int valor = Integer.parseInt(strs[2]);
-							try {
-								sistemaLeiloes.licitarItem(id, valor, ub.userOn);
-								synchronized(out) {
-									out.println("Licitação efetuada com sucesso!");
-									out.flush();
-								}
-							} catch (LeilaoException le) {
-								synchronized(out) {
-									out.println(le.getMessage());
-									out.flush();
-								}
-								continue;
-							}
-							break;
-						case "ls":
-							List<String> l = sistemaLeiloes.listarLeiloes(ub.userOn);
-							synchronized(out) {
-								for(String s : l) {
-									out.println(s);
-								}
-								out.flush();
-							}
-							if(l.size() == 0)
-								synchronized(out) {
-									out.println("Não existem leilões a decorrer");
-								}
-							break;
-						case "f":
-							int idl = Integer.parseInt(strs[1]);
-							String res;
-							try {
-								res = sistemaLeiloes.finalizarLeilao(idl, ub.userOn);
-								synchronized(out) {
-									out.println(res);
-									out.flush();
-								}
-							} catch (LeilaoException|UtilizadorException e) {
-								synchronized(out) {
-									out.println(e.getMessage());
-									out.flush();
-								}
-								continue;
-							}
-							break;
-						case "t": 
-							ub.running = false;
-							synchronized(out) {
-								out.println("Sessão terminada");
-								out.flush();
-							}
-							break;
-						default:
-							synchronized(out) {
-								out.println("Já se encontra com sessão iniciada!");
-								out.flush();
-							}
-							break;
-					}
-				}
+				if(ub.userOn == null)
+					naoAutenticado(strs);
+				else
+					autenticado(strs);
 			}
 		} catch(Exception e) {}
+	}
+
+	private void naoAutenticado(String[] strs) {
+		switch(strs[0]) {
+				case "l": 
+					boolean b = sistemaLeiloes.autenticar(strs[1], strs[2]);
+					if(b) {
+						synchronized(out) {
+							out.println("Login efetuado com sucesso!");
+							ub.userOn = strs[1];
+						}
+						cw.start();
+					}
+					else {
+						synchronized(out) {
+							out.println("Username ou password errados");
+						}
+					}
+					out.flush();
+					break;
+				case "r": 
+					try {
+						sistemaLeiloes.registarUtilizador(strs[1], strs[2]);
+					} catch (UtilizadorException e) {
+						synchronized(out) {
+							out.println(e.getMessage());
+							out.flush();
+						}
+						return;
+					}
+					synchronized(out) {
+						out.println("Registo efetuado com sucesso!");
+					}
+					out.flush();
+					break;
+				default:
+					synchronized(out) {
+						out.println("Faça login ou registe-se");
+						out.flush();
+					}
+					break;
+			}
+	}
+
+	public void autenticado(String[] strs) {
+		switch(strs[0]) {
+			case "i":
+				int inicial = Integer.parseInt(strs[2]);
+				int result;
+				result = sistemaLeiloes.iniciarLeilao(strs[1], ub.userOn, inicial);
+				StringBuilder sb = new StringBuilder();
+				sb.append("Id do seu leilão: ").append(result);
+				sb.append(".");
+				synchronized(out) {
+					out.println(sb.toString());
+					out.flush();
+				}
+				break;
+			case "lc":
+				int id = Integer.parseInt(strs[1]);
+				int valor = Integer.parseInt(strs[2]);
+				try {
+					sistemaLeiloes.licitarItem(id, valor, ub.userOn);
+					synchronized(out) {
+						out.println("Licitação efetuada com sucesso!");
+						out.flush();
+					}
+				} catch (LeilaoException le) {
+					synchronized(out) {
+						out.println(le.getMessage());
+						out.flush();
+					}
+					return;
+				}
+				break;
+			case "ls":
+				List<String> l = sistemaLeiloes.listarLeiloes(ub.userOn);
+				synchronized(out) {
+					for(String s : l) {
+						out.println(s);
+					}
+					out.flush();
+				}
+				if(l.size() == 0)
+					synchronized(out) {
+						out.println("Não existem leilões a decorrer");
+					}
+				break;
+			case "f":
+				int idl = Integer.parseInt(strs[1]);
+				String res;
+				try {
+					res = sistemaLeiloes.finalizarLeilao(idl, ub.userOn);
+					synchronized(out) {
+						out.println(res);
+						out.flush();
+					}
+				} catch (LeilaoException|UtilizadorException e) {
+					synchronized(out) {
+						out.println(e.getMessage());
+						out.flush();
+					}
+					return;
+				}
+				break;
+			case "t": 
+				ub.running = false;
+				synchronized(out) {
+					out.println("Sessão terminada");
+					out.flush();
+				}
+				break;
+			default:
+				synchronized(out) {
+					out.println("Já se encontra com sessão iniciada!");
+					out.flush();
+				}
+				break;
+		}
 	}
 
 }

@@ -104,14 +104,14 @@ public class SistemaLeiloes {
 	 * @param username Identificador único do utilizador
 	 * @param password Palavra passe para autenticação do utilizador
 	 */
-	public void registarUtilizador(String username, String password) throws UtilizadorException {
-		synchronized(this) {
-			if(utilizadores.containsKey(username)) {
-				throw new UtilizadorException("Nome de utilizador indisponível");
-			}
-			Utilizador user = new Utilizador(username, password);
-			utilizadores.put(username, user);
+	public synchronized void registarUtilizador(String username, String password) throws UtilizadorException {
+		Utilizador user;
+		if(utilizadores.containsKey(username)) {
+			String str = "Nome de utilizador indisponível";
+			throw new UtilizadorException(str);
 		}
+		user = new Utilizador(username, password);
+		utilizadores.put(username, user);
 	}
 
 	/**
@@ -121,9 +121,10 @@ public class SistemaLeiloes {
 	 * @return 		   Booleano que indica se o utilizador foi autenticado ou não
 	 */
 	public synchronized boolean autenticar(String username, String password) {
+		Utilizador user;
 		if(utilizadores.containsKey(username)) {
-			Utilizador u = utilizadores.get(username);
-			return u.password.equals(password);
+			user = utilizadores.get(username);
+			return user.password.equals(password);
 		}
 		return false;
 	}
@@ -136,10 +137,11 @@ public class SistemaLeiloes {
 	 * @return 				Id atribuido ao leilao inserido pelo utilizador
 	 */
 	public int iniciarLeilao(String descricaoItem, String vendedor, int valor_inicial) {
-		Leilao l = new Leilao(valor_inicial, descricaoItem, vendedor);
+		Leilao leilao; 
+		leilao = new Leilao(valor_inicial, descricaoItem, vendedor);
 		synchronized(this) {
 			currentID++;
-			leiloes.put(new Integer(currentID), l);
+			leiloes.put(new Integer(currentID), leilao);
 			return currentID;
 		}
 	}
@@ -149,22 +151,22 @@ public class SistemaLeiloes {
 		List<String> result = new ArrayList<>();
 		synchronized(this) {
 			leiloes.forEach((k,v) -> v.leilaoLocker.lock());
-		try {
-			leiloes.forEach((k,v) -> {
-				StringBuilder sb = new StringBuilder();
-				sb.append("Id leilao: ").append(k);
-				sb.append(". ").append(v.descricao_item);
-				sb.append(". Valor atual: ").append(v.valor_atual);
-				sb.append(".");
-				if(v.ultimoLicitador.equals(username))
-					sb.append(" +");
-				if(v.vendedor.equals(username))
-					sb.append(" *");
-				result.add(sb.toString());
-			});
-		} finally {
-			leiloes.forEach((k,v) -> v.leilaoLocker.unlock());
-		}
+			try {
+				leiloes.forEach((k,v) -> {
+					StringBuilder sb = new StringBuilder();
+					sb.append("Id leilao: ").append(k);
+					sb.append(". ").append(v.descricao_item);
+					sb.append(". Valor atual: ").append(v.valor_atual);
+					sb.append(".");
+					if(v.ultimoLicitador.equals(username))
+						sb.append(" +");
+					if(v.vendedor.equals(username))
+						sb.append(" *");
+					result.add(sb.toString());
+				});
+			} finally {
+				leiloes.forEach((k,v) -> v.leilaoLocker.unlock());
+			}
 		}
 		return result;
 	}
@@ -177,6 +179,7 @@ public class SistemaLeiloes {
 	 */
 	public void licitarItem(int idLeilao, int valor, String username) throws LeilaoException {
 		Leilao leilao;
+		String str;
 		Utilizador user;
 		synchronized(this) {
 			leilao = getLeilao(idLeilao);
@@ -185,7 +188,8 @@ public class SistemaLeiloes {
 		}
 		try {
 			if(!leilao.aDecorrer) {
-				throw new LeilaoException("O leilao já terminou!");
+				str = "O leilao já terminou!";
+				throw new LeilaoException(str);
 			}
 			if(valor > leilao.valor_atual) {
 				leilao.valor_atual = valor;
@@ -193,7 +197,10 @@ public class SistemaLeiloes {
 				leilao.ultimoLicitador = username;
 				leilao.addMessageLicitadores(idLeilao);
 			}
-			else throw new LeilaoException("O valor atual no leilao é igual ou superior!");
+			else {
+				str = "O valor atual no leilao é igual ou superior!";
+				throw new LeilaoException(str);
+			}
 		} finally {
 			leilao.leilaoLocker.unlock();
 		}
@@ -207,8 +214,9 @@ public class SistemaLeiloes {
 		synchronized(this) {
 			leilao = getLeilao(idLeilao);
 			user = utilizadores.get(username);
-			if (!user.username.equals(leilao.vendedor)) {
-				throw new UtilizadorException ("Sem permissão para finalizar leilão.");
+			if(!user.username.equals(leilao.vendedor)) {
+				String str = "Sem permissão para finalizar leilão.";
+				throw new UtilizadorException(str);
 			}
 			leilao.leilaoLocker.lock();
 			leiloes.remove(idLeilao);
@@ -217,9 +225,6 @@ public class SistemaLeiloes {
 			message = leilao.finalizaLeilao(idLeilao, user);
 		} finally {
 			leilao.leilaoLocker.unlock();
-		}
-		synchronized(this) {
-				leiloes.remove(idLeilao);
 		}
 		return message;
 	}
